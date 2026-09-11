@@ -40,37 +40,37 @@
         "status": "ok"
     },
     "thermal_zones": {
-        "value": 52.687,
+        "value": 52.718,
         "zones": [
             {
                 "zone": "thermal_zone0",
                 "type": "cpu-thermal",
-                "temp_c": 52.531
+                "temp_c": 52.656
             },
             {
                 "zone": "thermal_zone7",
                 "type": "soc2-thermal",
-                "temp_c": 52.093
+                "temp_c": 52.25
             },
             {
                 "zone": "thermal_zone5",
                 "type": "soc0-thermal",
-                "temp_c": 52.437
+                "temp_c": 52.531
             },
             {
                 "zone": "thermal_zone1",
                 "type": "gpu-thermal",
-                "temp_c": 52.687
+                "temp_c": 52.718
             },
             {
                 "zone": "thermal_zone8",
                 "type": "tj-thermal",
-                "temp_c": 52.687
+                "temp_c": 52.718
             },
             {
                 "zone": "thermal_zone6",
                 "type": "soc1-thermal",
-                "temp_c": 52.312
+                "temp_c": 52.468
             }
         ],
         "source": "/sys/class/thermal/thermal_zone*/temp",

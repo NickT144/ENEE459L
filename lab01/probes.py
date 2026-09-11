@@ -143,18 +143,18 @@ def probe_memory_total_kb(root: Path = Path("/")) -> dict[str, Any]:
     ever sees the pool. Students are expected to notice and to explain it in
     their report rather than round it up.
     """
-
-    # step 1: Read the raw null-terminated text from /proc/device-tree/model
+    # step 1: Read the raw null-terminated text from /proc/meminfo
     src = "/proc/meminfo"
     raw = read_text(root, src)
 
     # if unable to read, return an empty dictionary by calling unknown().
     if not raw:
-        return unknown(src, "memory info not found")
+        return unknown(src, "Unable to read /proc/meminfo")
     
     # step 2: strip null bytes and whitespace from raw string
     raw = raw.rstrip("\x00").strip()
 
+    # step 3: parse MemTotal
     pattern = r'^MemTotal:\s+(\d+)\s*kB'
     match = re.search(pattern, raw)
     memory = int(match.group(1))
@@ -174,16 +174,18 @@ def probe_root_source(root: Path = Path("/")) -> dict[str, Any]:
     /proc/mounts is preferred over `findmnt` because it needs no external
     binary and no elevation, and because it is what findmnt reads anyway.
     """
-    # step 1: Read the raw null-terminated text from /proc/device-tree/model
+    # step 1: Read the raw null-terminated text from /proc/mounts
     src = "/proc/mounts"
     raw = read_text(root, src)
 
     # if unable to read, return an empty dictionary by calling unknown().
     if not raw:
-        return unknown(src, "no root mount entry found in mount table")
+        return unknown(src, "Unable to read /proc/mounts")
     
     # step 2: strip null bytes and whitespace from raw string
     raw = raw.rstrip("\x00").strip()
+
+    # step 3: parse for device_name and kind
     kind = ""
     device_name = ""
     for line in raw.split("\n"):
@@ -205,15 +207,16 @@ def probe_nvme_present(root: Path = Path("/")) -> dict[str, Any]:
     is what lets the troubleshooting tree in the lab guide send a student to
     the right branch.
     """
+    # step 1: Check if /sys/block/nvme0n1/ exists
     path = Path("/sys/block/nvme0n1/")
     present = path.exists()
 
-    # step 1: Read the raw null-terminated text from /proc/device-tree/model
+    # step 1: Read the raw null-terminated text from sys/block/nvme0n1/device/model
     src = "/sys/block/nvme0n1/device/model"
     raw = read_text(root, src)
     # if unable to read, return an empty dictionary by calling unknown().
     if not raw:
-        return unknown(src, "/sys/block/nvme0n1 does not exist")
+        return unknown(src, "Unable to read /sys/block/nvme0n1/device/model")
     
     # step 2: strip null bytes and whitespace from raw string
     raw = raw.rstrip("\x00").strip()  
@@ -237,7 +240,7 @@ def probe_pcie_link(root: Path = Path("/"), lspci_output: str | None = None) -> 
     `lspci_output` exists so the tests can drive this without root or hardware.
     In normal use it is None and the probe shells out.
     """
-    # step 1: Read the raw null-terminated text from /proc/device-tree/model
+    # step 1: Run lspci command to find storage pcie link
     cmd = "lspci -d ::0106 -d ::0108 -vv"
     output = run(cmd.split(" "))
 
@@ -248,6 +251,7 @@ def probe_pcie_link(root: Path = Path("/"), lspci_output: str | None = None) -> 
     # step 2: strip null bytes and whitespace from raw string
     output = output.rstrip("\x00").strip()  
 
+    # step 3: parse capability and negotiated dicts
     capability = dict()
     negotiated = dict()
     for line in output.split("\n"):
@@ -278,6 +282,7 @@ def probe_thermal_zones(root: Path = Path("/")) -> dict[str, Any]:
     path = Path('/sys/class/thermal/')
     thermal_dirs = list(path.glob('thermal_zone*/'))
 
+    # iterate through temp zones and parse out temps and types
     for thermal_dir in thermal_dirs: 
         try:
             type = ""
@@ -297,7 +302,6 @@ def probe_thermal_zones(root: Path = Path("/")) -> dict[str, Any]:
         except TypeError as error:
             continue
 
-
     return {
         "value": max([thermal["temp_c"] for thermal in thermals]),
         "zones": thermals,
@@ -314,17 +318,18 @@ def probe_power_mode(root: Path = Path("/"), nvpmodel_output: str | None = None)
     same model are usually reporting different power modes, and without this
     field there is no way to find that out after the fact.
     """
-    # step 1: Read the raw null-terminated text from /proc/device-tree/model
+    # step 1: Run command nvpmodel -q
     cmd = "nvpmodel -q"
     output = run(cmd.split(" "))
 
     # if unable to read, return an empty dictionary by calling unknown().
     if not output:
-        return unknown(cmd, "power mode not found")
+        return unknown(cmd, "Unable to run nvpmodel -q")
     
     # step 2: strip null bytes and whitespace from raw string
     output = output.rstrip("\x00").strip()   
 
+    # step 3: parse power mode and id
     pattern = r'NV Power Mode:\s*(.+)'
     match = re.search(pattern, output)
     mode_name = match.group(1)
@@ -334,7 +339,7 @@ def probe_power_mode(root: Path = Path("/"), nvpmodel_output: str | None = None)
     mode_id = match.group(1)
 
     if not mode_name or not mode_id:
-        return unknown(cmd, "power mode not found")
+        return unknown(cmd, "Cannot parse output")
     
     return {
         "value": mode_name,
