@@ -1,0 +1,42 @@
+{
+    "probe_torch": {
+        "value": "2.14.0+cu126",
+        "source": "import torch",
+        "status": "ok",
+        "version": {
+            "raw": "2.14.0+cu126",
+            "public": "2.14.0",
+            "local": "cu126",
+            "nvidia_build": false
+        },
+        "cuda_available": null,
+        "cuda_version": "12.6",
+        "device_name": null,
+        "diagnosis": "torch is installed but does not expose torch.cuda.is_available"
+    },
+    "probe_cuda": {
+        "value": "12.6.11",
+        "source": "/usr/local/cuda/version.json",
+        "status": "ok",
+        "line": "12.6"
+    },
+    "probe_opencv": {
+        "value": null,
+        "source": "import cv2",
+        "status": "unknown",
+        "detail": "cv2 is not importable: No module named 'import cv2'"
+    },
+    "probe_tensorrt": {
+        "value": "10.3.0",
+        "source": "import tensorrt",
+        "status": "ok",
+        "line": "10.3"
+    },
+    "probe_l4t": {
+        "value": "36.5.0",
+        "source": "/etc/nv_tegra_release",
+        "status": "ok",
+        "line": "36.5",
+        "raw": "# R36 (release), REVISION: 5.0, GCID: 43688277, BOARD: generic, EABI: aarch64, DATE: Fri Jan 16 03:50:45 UTC 2026"
+    }
+}
