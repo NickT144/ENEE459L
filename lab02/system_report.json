@@ -9,10 +9,10 @@
             "local": "cu126",
             "nvidia_build": false
         },
-        "cuda_available": null,
+        "cuda_available": true,
         "cuda_version": "12.6",
-        "device_name": null,
-        "diagnosis": "torch is installed but does not expose torch.cuda.is_available"
+        "device_name": "Orin",
+        "diagnosis": "torch is installed and sees the GPU"
     },
     "probe_cuda": {
         "value": "12.6.11",
@@ -21,10 +21,12 @@
         "line": "12.6"
     },
     "probe_opencv": {
-        "value": null,
+        "value": "4.5.4",
         "source": "import cv2",
-        "status": "unknown",
-        "detail": "cv2 is not importable: No module named 'import cv2'"
+        "status": "ok",
+        "cuda_devices": 0,
+        "cuda_enabled": false,
+        "detail": "the cv2.cuda namespace exists but reports no devices \u2014 this is a non-CUDA build"
     },
     "probe_tensorrt": {
         "value": "10.3.0",

@@ -5,7 +5,6 @@ import re
 from typing import Any
 import sys
 import json
-
 from env import Env, ModuleNotAvailable, getattr_path, read_text, unknown, major_minor
 
 # The NVIDIA-built PyTorch wheels for Jetson carry a local version segment —
@@ -36,7 +35,7 @@ def _split_local_version(raw: str) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 def probe_torch(env: Env) -> dict[str, Any]:
-    #write your code here
+    src = "import torch"
     try:
         torch = env.importer("torch")
         status = "ok"
@@ -46,21 +45,21 @@ def probe_torch(env: Env) -> dict[str, Any]:
         if raw:
             version = _split_local_version(str(raw))
 
-        output = getattr_path(torch, "cuda.is_available")
+        available = getattr_path(torch, "cuda.is_available")
         cuda_available = None
-        if callable(raw):
-            cuda_available = bool(raw())
+        if callable(available):
+            cuda_available = bool(available())
 
         device = None
         if cuda_available:
-            output = getattr_path(torch, "cuda.get_device_name")
+            name = getattr_path(torch, "cuda.get_device_name")
 
-            if callable(output):
-                device = output(0)
+            if callable(name):
+                device = name(0)
 
         out = {
                 "value": raw,
-                "source": "import torch",
+                "source": src,
                 "status": status,
                 "version": version,
                 "cuda_available": cuda_available,
@@ -70,7 +69,7 @@ def probe_torch(env: Env) -> dict[str, Any]:
 
         if not raw:
             out["detail"] = "torch imported but exposes no __version__" 
-            status = "unknown"
+            out["status"] = "unknown"
             return out
 
         nv = False
@@ -87,9 +86,8 @@ def probe_torch(env: Env) -> dict[str, Any]:
             out["diagnosis"] = "this wheel has no NVIDIA local version tag and cannot see the GPU — it is almost certainly a stock PyPI wheel and must be replaced from the Jetson index"
 
         return out
-
     except ModuleNotAvailable as e:
-        return unknown("torch", f"torch is not importable: {e}")
+        return unknown(src, f"torch is not importable: {e}")
 
 
 def probe_cuda(env: Env) -> dict[str, Any]:
@@ -116,11 +114,12 @@ def probe_cuda(env: Env) -> dict[str, Any]:
 
 
 def probe_opencv(env: Env) -> dict[str, Any]:
-    #write your code here
     src = "import cv2"
+    status = "ok"
     try:
-        cv2 = env.importer(src)
+        cv2 = env.importer("cv2")
         raw = getattr_path(cv2, "__version__")
+
         counter = getattr_path(cv2, "cuda.getCudaEnabledDeviceCount")
         cuda_devices = None
         detail = "no cv2.cuda namespace — a non-CUDA build, which is what JetPack ships"
@@ -130,20 +129,21 @@ def probe_opencv(env: Env) -> dict[str, Any]:
             if cuda_devices != 0:
                 detail = f"built with CUDA, {cuda_devices} device(s) visible"
 
+        if not raw:
+            status = "unknown"
+
         return {
                 "value": raw,
                 "source": src,
-                "status": "ok",
+                "status": status,
                 "cuda_devices": cuda_devices,
                 "cuda_enabled": bool(cuda_devices),
                 "detail": detail
                 }
-
     except ModuleNotAvailable as e:
         return unknown(src, f"cv2 is not importable: {e}")
 
 def probe_tensorrt(env: Env) -> dict[str, Any]:
-    # write your code here
     src = "import tensorrt" 
     try:
         trt = env.importer("tensorrt")
@@ -187,7 +187,6 @@ def probe_l4t(env: Env) -> dict[str, Any]:
             "line": major_minor(version),
             "raw": raw.splitlines()[0]
             }
-
 
 ## for debugging - uncomment the following lines for debugging.
 # if __name__ == "__main__":
