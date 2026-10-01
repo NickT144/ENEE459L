@@ -65,7 +65,7 @@ def _layer_parameters(ly: Layer):
     elif ly.kind == "bn":
         return BN_PARAMS_PER_CHANNEL * ly.out_shape[0]
     else:
-            return 0
+        return 0
 
 # ===========================================================================
 # 1. How many numbers are stored
@@ -79,7 +79,7 @@ def count_parameters(graph: Graph) -> dict[str, Any]:
         per_layer[ly.name] = param_count  
         total += param_count
 
-    return computed(total, "count parameters of graph", per_layer=per_layer, includes_bias=True, excludes_bn_buffers=True, bn_params_per_channel=BN_PARAMS_PER_CHANNEL)
+    return computed(total, f"{graph.name}: {len(graph.layers)} layers, shapes from description", per_layer=per_layer, includes_bias=True, excludes_bn_buffers=True, bn_params_per_channel=BN_PARAMS_PER_CHANNEL)
     pass
 
 
@@ -112,13 +112,14 @@ def model_size_bytes(graph: Graph) -> dict[str, Any]:
     """
     per_dtype = dict()
     per_layer = dict()
-    buffer_bytes = 0
+    buffer_bytes = 0.0
     total = 0
 
     for ly in graph.layers:
+        per_dtype.setdefault(ly.weight_dtype, 0)
         parameter_count = _layer_parameters(ly)
         parameter_bytes = parameter_count * dtype_bytes(ly.weight_dtype)
-        per_dtype[ly.weight_dtype] = parameter_bytes
+        per_dtype[ly.weight_dtype] += parameter_bytes
 
         ly_buffer_bytes = 0
         if ly.kind == "bn":
@@ -131,7 +132,7 @@ def model_size_bytes(graph: Graph) -> dict[str, Any]:
         per_layer[ly.name] = parameter_bytes + ly_buffer_bytes
         total += parameter_bytes + ly_buffer_bytes
 
-    return computed(total, "model size bytes", per_layer=per_layer, per_dtype=per_dtype, buffer_bytes=buffer_bytes, container_overhead_excluded=True)
+    return computed(total, f"{graph.name}: per-layer dtypes, buffers at {BUFFER_DTYPE}", per_layer=per_layer, per_dtype=per_dtype, buffer_bytes=buffer_bytes, container_overhead_excluded=True)
 
 # ===========================================================================
 # 3. The memory nobody puts in the table
@@ -156,6 +157,8 @@ def _last_use(graph: Graph) -> dict[str, int]:
               last["__input__"] = 0
           if i > 0:
               last[names[i - 1]] = i
+          else:
+              last.setdefault(ly.name, i)
             
     last[graph.layers[-1].name] = len(graph) - 1
 
@@ -232,7 +235,7 @@ def count_activations(graph: Graph) -> dict[str, Any]:
           if i == last_use[name]:
             del live[name]
 
-    return computed(peak_bytes, "count activations", peak_at=peak_at, peak_elements = _peak_elements(graph, last_use), total_elements = total_elements, total_bytes=total_bytes, includes_network_input=True)
+    return computed(peak_bytes, f"{graph.name}: liveness over {len(graph.layers)} layers, input included", peak_at=peak_at, peak_elements = _peak_elements(graph, last_use), total_elements = total_elements, total_bytes=total_bytes, includes_network_input=True)
 
 
 
@@ -272,7 +275,7 @@ def to_flops(macs: dict[str, Any], convention: str = "mac_is_two_flops") -> dict
     factor = FLOP_CONVENTIONS[convention]
     flops = factor * macs["value"]
 
-    per_layer = macs["per_layer"]
+    per_layer = macs["per_layer"].copy()
     for ly in per_layer:
         per_layer[ly] *= factor
 
