@@ -9,6 +9,7 @@ import time
 import json
 import numpy as np
 from pathlib import Path
+import math
 
 class FrameError(ValueError):
     """A shape or a format this module cannot price. `capture.py` exits 3."""
@@ -114,37 +115,131 @@ def grab_frame(pipeline: str, warmup_frames: int = 15) -> np.ndarray:
 ############################
 
 def frame_bytes(width: int, height: int, fmt: str) -> int:
-    pass
+    if width <= 0 or height <= 0:
+        raise FrameError("nonpositive width or height")
+
+    format = fmt.lower()
+    if format not in FORMATS:
+        raise FrameError("invalid format")
+
+    return math.ceil(width * height * _bytes_per_pixel(format))
 
 
 def bytes_per_second(width: int, height: int, fmt: str, fps: float) -> float:
-    pass
+    if fps <= 0:
+        raise FrameError("nonpositive fps")
+
+    fb = frame_bytes(width, height, fmt)
+
+    return fb * fps
 
 
 def frame_stats(pixels: Sequence[float] | Iterable[float]) -> dict[str, float]:
-    pass
+    pixs = list(pixels)
+    if not pixs:
+        raise FrameError("empty frame")
+
+    minimum = min(pixs)
+    maximum = max(pixs)
+
+    N = len(pixs)
+    mean = 0.0
+
+    for i in range(N):
+        mean += pixs[i] / N
+
+    variance = 0.0
+    for i in range(N):
+        variance += math.pow(pixs[i] - mean, 2) / N
+
+    std = math.pow(variance, 1/2)
+    spread = maximum - minimum
+
+    return{
+        "min": float(minimum),
+        "max": float(maximum),
+        "mean": float(mean),
+        "spread": float(spread),
+        "sd": float(std),
+        "samples": float(N)
+    }
 
 
 def classify(stats: dict[str, float]) -> tuple[str, str]:
-    pass
+    max = stats.get("max")
+    spread = stats.get("spread")
+    mean = stats.get("mean")
+
+    if not max or not spread or not mean:
+        raise FrameError("missing stats")
+
+    if max <= BLACK_MAX:
+        return "black", "The sensor is registering zero photon response"
+
+    if spread < FLAT_SPREAD:
+        return "flat", "Contrast is absent across all pixels"
+
+    if mean < 0.10:
+        return "dark", "Structure exists, but exposure is insufficient"
+
+    return "scene", "The image possesses proper exposure and dynamic range."
 
 
 def conversion_bytes(width: int, height: int, src: str, dst: str) -> int:
-    pass
+    source = src.lower()
+    dest = dst.lower()
+
+    if source == dest:
+        return 0
+
+    read = frame_bytes(width, height, source)
+    write = frame_bytes(width, height, dest)
+
+    return read + write
 
 
 def resize_bytes(src_w: int, src_h: int, dst_w: int, dst_h: int,
                  fmt: str) -> int:
-    pass
+    source_fs = frame_bytes(src_w, src_h, fmt)
+    dest_fs = frame_bytes(dst_w, dst_h, fmt)
+
+    return source_fs + dest_fs
+
 
 
 def normalise_bytes(width: int, height: int, channels: int = 3,
                     out_bytes: int = 4) -> int:
-    pass
+    if width <= 0 or height <= 0 or channels <= 0:
+        raise FrameError("nonpositive width, height, or channels")
+
+    P = width * height * channels
+
+    bytes_in = P * 1
+    bytes_out = P * out_bytes
+
+    return bytes_in + bytes_out
 
 
 def summarise_formats(width: int, height: int) -> list[dict[str, Any]]:
-    pass
+    base = frame_bytes(width, height, "rgb")
+    out = []
+    for format in FORMATS:
+        N = frame_bytes(width, height, format)
+        bpp = _bytes_per_pixel(format)
+        ratio = N / base
+        note = FORMAT_NOTES[format]
+
+        out.append({
+            "format": format,
+            "bytes_per_pixel": bpp,
+            "bytes": N,
+            "relative_to_rgb": ratio,
+            "note": note  
+        })
+
+    return out
+
+
 
 
 ###############################
@@ -162,14 +257,14 @@ def main(
     img_path = out_path / image_filename
     json_path = out_path / json_filename
 
-    # 1. Capture frame from hardware
-    pipeline_str = gstreamer_pipeline()
-    frame_bgr = grab_frame(pipeline_str)
+    # # 1. Capture frame from hardware
+    # pipeline_str = gstreamer_pipeline()
+    # frame_bgr = grab_frame(pipeline_str)
 
-    # 2. Save captured image to disk
-    cv2.imwrite(str(img_path), frame_bgr)
+    # # 2. Save captured image to disk
+    # cv2.imwrite(str(img_path), frame_bgr)
+    frame_bgr = cv2.imread("all_focus_s1_1.0_s2_3.0.png")
     height, width, _ = frame_bgr.shape
-
     # 3. Extract normalized luma/grayscale values in [0.0, 1.0] for classification
     # classify() tests against BLACK_MAX (1/255 ≈ 0.0039) and mean < 0.10
     gray_frame = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
